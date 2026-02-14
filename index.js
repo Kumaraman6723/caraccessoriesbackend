@@ -59,10 +59,13 @@ const CORS_ORIGINS = [
 app.use(
   cors({
     origin: (origin, cb) => {
-      if (!origin || CORS_ORIGINS.includes(origin)) return cb(null, true);
-      cb(null, false);
+      if (!origin) return cb(null, true);
+      if (CORS_ORIGINS.includes(origin)) return cb(null, true);
+      cb(null, true);
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Admin-Token"],
   })
 );
 app.use(express.json());
