@@ -47,7 +47,24 @@ const upload = multer({
   },
 });
 
-app.use(cors({ origin: true, credentials: true }));
+const CORS_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:3000",
+  "https://caraccessories-gray.vercel.app",
+  "https://www.caraccessories-gray.vercel.app",
+  ...(process.env.CORS_ORIGINS || "").split(",").map((o) => o.trim()).filter(Boolean),
+];
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin || CORS_ORIGINS.includes(origin)) return cb(null, true);
+      cb(null, false);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // ============ Helpers ============
