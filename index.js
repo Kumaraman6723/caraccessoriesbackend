@@ -117,6 +117,10 @@ function isAdminEmail(email) {
 
 // ============ Routes ============
 
+app.get("/api", (req, res) => {
+  res.json({ status: "OK", message: "Banty Car Accessories API", docs: "Use /api/health, /api/products, etc." });
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "OK", message: "Banty Car Accessories API", timestamp: new Date().toISOString() });
 });
