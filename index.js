@@ -24,14 +24,18 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
 const ADMIN_GMAIL = process.env.ADMIN_GMAIL || "";
 const BANTY_CONTACT_PHONE = process.env.BANTY_CONTACT_PHONE || "";
 
-const PRODUCTS_PATH = path.join(__dirname, "data", "products.json");
+// On Vercel, filesystem is read-only except /tmp; use /tmp for writes
+const IS_VERCEL = !!process.env.VERCEL;
+const PRODUCTS_PATH = IS_VERCEL
+  ? path.join("/tmp", "data", "products.json")
+  : path.join(__dirname, "data", "products.json");
 
 // Multer for product images (save to tmp, then upload to Cloudinary)
+const TMP_DIR = IS_VERCEL ? path.join("/tmp", "uploads") : path.join(__dirname, "tmp");
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "tmp");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
+    if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
+    cb(null, TMP_DIR);
   },
   filename: (req, file, cb) => {
     cb(null, `product-${Date.now()}-${Math.random().toString(36).slice(2)}${path.extname(file.originalname) || ".jpg"}`);
@@ -73,6 +77,16 @@ app.use(express.json());
 // ============ Helpers ============
 function loadProducts() {
   try {
+    // On Vercel: copy from read-only deployed file to /tmp on first load if needed
+    if (IS_VERCEL) {
+      const dir = path.dirname(PRODUCTS_PATH);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      if (!fs.existsSync(PRODUCTS_PATH)) {
+        const src = path.join(__dirname, "data", "products.json");
+        if (fs.existsSync(src)) fs.copyFileSync(src, PRODUCTS_PATH);
+        else fs.writeFileSync(PRODUCTS_PATH, "[]", "utf8");
+      }
+    }
     const raw = fs.readFileSync(PRODUCTS_PATH, "utf8");
     const data = JSON.parse(raw);
     return Array.isArray(data) ? data : [];
@@ -82,6 +96,10 @@ function loadProducts() {
 }
 
 function saveProducts(products) {
+  if (IS_VERCEL) {
+    const dir = path.dirname(PRODUCTS_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  }
   fs.writeFileSync(PRODUCTS_PATH, JSON.stringify(products, null, 2), "utf8");
 }
 
@@ -377,7 +395,11 @@ app.use("*", (req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Banty Car Accessories API running on port ${PORT}`);
-});
+// Export for Vercel serverless; listen for local development
+module.exports = app;
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Banty Car Accessories API running on port ${PORT}`);
+  });
+}
